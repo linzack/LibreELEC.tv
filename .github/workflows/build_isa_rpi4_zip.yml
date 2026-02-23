@@ -1,0 +1,81 @@
+name: Build ISA RPi4 Zip
+
+on:
+  workflow_dispatch:
+    inputs:
+      isa_repo:
+        description: "inputstream.adaptive Repository (owner/repo format)"
+        required: true
+        default: "linzack/inputstream.adaptive"
+      isa_commit:
+        description: "inputstream.adaptive Commit Hash or Branch"
+        required: true
+        default: "master"
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout LibreELEC.tv
+        uses: actions/checkout@v4
+
+      - name: Resolve inputstream.adaptive Commit Hash
+        id: resolve_isa
+        run: |
+          ENCODED_COMMIT=$(jq -rn --arg commit "${{ inputs.isa_commit }}" '$commit | @uri')
+          echo "Encoded commit is: ${ENCODED_COMMIT}"
+
+          RESPONSE=$(curl -sL -w "\n%{http_code}" \
+            "https://api.github.com/repos/${{ inputs.isa_repo }}/commits/${ENCODED_COMMIT}")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status Code: ${HTTP_CODE}"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Response Body:"
+            echo "$BODY"
+            echo "::error::Failed to resolve '${{ inputs.isa_commit }}' in repo '${{ inputs.isa_repo }}' (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+          FULL_SHA=$(echo "$BODY" | jq -r '.sha')
+          SHORT_SHA=${FULL_SHA:0:7}
+
+          echo "isa_sha=${FULL_SHA}" >> "$GITHUB_OUTPUT"
+          echo "isa_short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+          echo "✓ Resolved '${{ inputs.isa_commit }}' -> ${FULL_SHA} (${SHORT_SHA})"
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bash bc bzip2 curl diffutils gawk gcc gperf gzip file \
+            patchutils lzop make patch perl rdfind rsync sed tar unzip \
+            xz-utils zip zstd libncurses5-dev libc6-dev \
+            libjson-perl libparse-yapp-perl libxml-parser-perl \
+            xsltproc default-jre g++ xfonts-utils python3 \
+            qemu-user-static
+
+      - name: Configure Custom inputstream.adaptive Source
+        env:
+          ISA_SHA: ${{ steps.resolve_isa.outputs.isa_sha }}
+        run: |
+          ISA_TARBALL_URL="https://github.com/${{ inputs.isa_repo }}/archive/\${PKG_VERSION}.tar.gz"
+
+          sed -i "s|^PKG_VERSION=.*|PKG_VERSION=\"${ISA_SHA}\"|" packages/mediacenter/kodi-binary-addons/inputstream.adaptive/package.mk
+          sed -i "s|^PKG_SHA256=.*|PKG_SHA256=\"\"|" packages/mediacenter/kodi-binary-addons/inputstream.adaptive/package.mk
+          sed -i "s|^PKG_URL=.*|PKG_URL=\"${ISA_TARBALL_URL}\"|" packages/mediacenter/kodi-binary-addons/inputstream.adaptive/package.mk
+
+          echo "Modified inputstream.adaptive package.mk:"
+          head -n 15 packages/mediacenter/kodi-binary-addons/inputstream.adaptive/package.mk
+
+      - name: Build inputstream.adaptive Addon
+        run: |
+          PROJECT=RPi DEVICE=RPi4 ARCH=aarch64 scripts/create_addon inputstream.adaptive
+
+      - name: Upload Addon Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: inputstream.adaptive-RPi4-${{ steps.resolve_isa.outputs.isa_short_sha }}
+          path: target/addons/**/*.zip

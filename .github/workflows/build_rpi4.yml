@@ -1,0 +1,83 @@
+name: Build LibreELEC RPi4
+
+on:
+  workflow_dispatch:
+    inputs:
+      kodi_repo:
+        description: "Kodi Repository (owner/repo format, e.g. linzack/xbmc)"
+        required: true
+        default: "linzack/xbmc"
+      kodi_commit:
+        description: "Kodi Commit Hash or Branch"
+        required: true
+        default: "master"
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout LibreELEC.tv
+        uses: actions/checkout@v4
+
+      - name: Resolve Kodi Commit Hash
+        id: resolve_kodi
+        run: |
+          # Resolve branch/tag/ref to a full commit SHA using GitHub API
+          ENCODED_COMMIT=$(jq -rn --arg commit "${{ inputs.kodi_commit }}" '$commit | @uri')
+          echo "Encoded commit is: ${ENCODED_COMMIT}"
+
+          RESPONSE=$(curl -sL -w "\n%{http_code}" \
+            "https://api.github.com/repos/${{ inputs.kodi_repo }}/commits/${ENCODED_COMMIT}")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status Code: ${HTTP_CODE}"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Response Body:"
+            echo "$BODY"
+            echo "::error::Failed to resolve '${{ inputs.kodi_commit }}' in repo '${{ inputs.kodi_repo }}' (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+          FULL_SHA=$(echo "$BODY" | jq -r '.sha')
+          SHORT_SHA=${FULL_SHA:0:7}
+
+          echo "kodi_sha=${FULL_SHA}" >> "$GITHUB_OUTPUT"
+          echo "kodi_short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+          echo "✓ Resolved '${{ inputs.kodi_commit }}' -> ${FULL_SHA} (${SHORT_SHA})"
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bash bc bzip2 curl diffutils gawk gcc gperf gzip file \
+            patchutils lzop make patch perl rdfind rsync sed tar unzip \
+            xz-utils zip zstd libncurses5-dev libc6-dev \
+            libjson-perl libparse-yapp-perl libxml-parser-perl \
+            xsltproc default-jre g++ xfonts-utils python3 \
+            qemu-user-static
+
+      - name: Configure Custom Kodi Source
+        env:
+          KODI_SHA: ${{ steps.resolve_kodi.outputs.kodi_sha }}
+        run: |
+          # Build tarball URL from owner/repo format using the resolved commit hash
+          KODI_TARBALL_URL="https://github.com/${{ inputs.kodi_repo }}/archive/\${PKG_VERSION}.tar.gz"
+
+          sed -i "s|^PKG_VERSION=.*|PKG_VERSION=\"${KODI_SHA}\"|" packages/mediacenter/kodi/package.mk
+          sed -i "s|^PKG_SHA256=.*|PKG_SHA256=\"\"|" packages/mediacenter/kodi/package.mk
+          sed -i "s|^PKG_URL=.*|PKG_URL=\"${KODI_TARBALL_URL}\"|" packages/mediacenter/kodi/package.mk
+
+          echo "Modified package.mk:"
+          head -n 15 packages/mediacenter/kodi/package.mk
+
+      - name: Build Image
+        run: |
+          ARCH=aarch64 BUILD_PERIODIC=nightly BUILDER_NAME=linzack PROJECT=RPi DEVICE=RPi4 scripts/image mkimage
+
+      - name: Upload Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: LibreELEC-RPi4-${{ steps.resolve_kodi.outputs.kodi_short_sha }}
+          path: target/*.img.gz

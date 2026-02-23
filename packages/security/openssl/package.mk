@@ -30,7 +30,8 @@ PKG_CONFIGURE_OPTS_SHARED="--libdir=lib \
                            no-static-engine"
 
 PKG_CONFIGURE_OPTS_HOST="--prefix=${TOOLCHAIN} \
-                         --openssldir=${TOOLCHAIN}/etc/ssl"
+                         --openssldir=${TOOLCHAIN}/etc/ssl \
+                         no-asm"
 PKG_CONFIGURE_OPTS_TARGET="--prefix=/usr \
                            --openssldir=/etc/ssl"
 

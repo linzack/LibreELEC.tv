@@ -4,10 +4,10 @@
 
 PKG_NAME="mtdev"
 PKG_VERSION="1.1.7"
-PKG_SHA256="a107adad2101fecac54ac7f9f0e0a0dd155d954193da55c2340c97f2ff1d814e"
+PKG_SHA256="a55bd02a9af4dd266c0042ec608744fff3a017577614c057da09f1f4566ea32c"
 PKG_LICENSE="MIT"
-PKG_SITE="http://bitmath.org"
-PKG_URL="http://bitmath.org/code/mtdev/${PKG_NAME}-${PKG_VERSION}.tar.bz2"
+PKG_SITE="https://packages.debian.org/source/sid/mtdev"
+PKG_URL="http://ftp.debian.org/debian/pool/main/m/mtdev/${PKG_NAME}_${PKG_VERSION}.orig.tar.gz"
 PKG_DEPENDS_TARGET="toolchain"
 PKG_LONGDESC="The mtdev is a stand-alone library which transforms all variants of kernel MT events to the slotted type B protocol."
 PKG_BUILD_FLAGS="+pic"
