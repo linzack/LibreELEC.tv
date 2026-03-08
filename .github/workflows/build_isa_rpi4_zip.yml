@@ -11,6 +11,14 @@ on:
         description: "inputstream.adaptive Commit Hash or Branch"
         required: true
         default: "master"
+      kodi_repo:
+        description: "Kodi Repository (owner/repo format)"
+        required: true
+        default: "xbmc/xbmc"
+      kodi_commit:
+        description: "Kodi Commit Hash or Branch"
+        required: true
+        default: "master"
 
 jobs:
   build:
@@ -46,6 +54,30 @@ jobs:
 
           echo "✓ Resolved '${{ inputs.isa_commit }}' -> ${FULL_SHA} (${SHORT_SHA})"
 
+      - name: Resolve Kodi Commit Hash
+        id: resolve_kodi
+        run: |
+          ENCODED_COMMIT=$(jq -rn --arg commit "${{ inputs.kodi_commit }}" '$commit | @uri')
+          echo "Encoded commit is: ${ENCODED_COMMIT}"
+
+          RESPONSE=$(curl -sL -w "\n%{http_code}" \
+            "https://api.github.com/repos/${{ inputs.kodi_repo }}/commits/${ENCODED_COMMIT}")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status Code: ${HTTP_CODE}"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Response Body:"
+            echo "$BODY"
+            echo "::error::Failed to resolve Kodi commit '${{ inputs.kodi_commit }}' in repo '${{ inputs.kodi_repo }}' (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+          FULL_SHA=$(echo "$BODY" | jq -r '.sha')
+          echo "kodi_sha=${FULL_SHA}" >> "$GITHUB_OUTPUT"
+
+          echo "✓ Resolved Kodi '${{ inputs.kodi_commit }}' -> ${FULL_SHA}"
+
       - name: Install Dependencies
         run: |
           sudo apt-get update
@@ -69,6 +101,19 @@ jobs:
 
           echo "Modified inputstream.adaptive package.mk:"
           head -n 15 packages/mediacenter/kodi-binary-addons/inputstream.adaptive/package.mk
+
+      - name: Configure Custom Kodi Source
+        env:
+          KODI_SHA: ${{ steps.resolve_kodi.outputs.kodi_sha }}
+        run: |
+          KODI_TARBALL_URL="https://github.com/${{ inputs.kodi_repo }}/archive/\${PKG_VERSION}.tar.gz"
+
+          sed -i "s|^PKG_VERSION=.*|PKG_VERSION=\"${KODI_SHA}\"|" packages/mediacenter/kodi/package.mk
+          sed -i "s|^PKG_SHA256=.*|PKG_SHA256=\"\"|" packages/mediacenter/kodi/package.mk
+          sed -i "s|^PKG_URL=.*|PKG_URL=\"${KODI_TARBALL_URL}\"|" packages/mediacenter/kodi/package.mk
+
+          echo "Modified Kodi package.mk:"
+          head -n 15 packages/mediacenter/kodi/package.mk
 
       - name: Build inputstream.adaptive Addon
         run: |
