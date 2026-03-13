@@ -1,0 +1,102 @@
+name: Kodi Linting
+
+on:
+  workflow_dispatch:
+    inputs:
+      kodi_repo:
+        description: "Kodi Repository (owner/repo format, e.g. linzack/xbmc)"
+        required: true
+        default: "linzack/xbmc"
+      kodi_commit:
+        description: "Kodi Commit Hash or Branch"
+        required: true
+        default: "master"
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout LibreELEC.tv
+        uses: actions/checkout@v4
+
+      - name: Resolve Kodi Commit Hash
+        id: resolve_kodi
+        run: |
+          ENCODED_COMMIT=$(jq -rn --arg commit "${{ inputs.kodi_commit }}" '$commit | @uri')
+          RESPONSE=$(curl -sL -w "\n%{http_code}" \
+            "https://api.github.com/repos/${{ inputs.kodi_repo }}/commits/${ENCODED_COMMIT}")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Failed to resolve '${{ inputs.kodi_commit }}' in repo '${{ inputs.kodi_repo }}' (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+          FULL_SHA=$(echo "$BODY" | jq -r '.sha')
+          echo "kodi_sha=${FULL_SHA}" >> "$GITHUB_OUTPUT"
+          echo "✓ Resolved '${{ inputs.kodi_commit }}' -> ${FULL_SHA}"
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bash bc bzip2 curl diffutils gawk gcc gperf gzip file \
+            patchutils lzop make patch perl rdfind rsync sed tar unzip \
+            xz-utils zip zstd libncurses5-dev libc6-dev \
+            libjson-perl libparse-yapp-perl libxml-parser-perl \
+            xsltproc default-jre g++ xfonts-utils python3 \
+            clang-tidy clang-format cmake gperf \
+            libudev-dev libasound2-dev libdbus-1-dev libfreetype6-dev \
+            libsqlite3-dev libxml2-dev libxslt1-dev libssl-dev \
+            libass-dev libcurl4-openssl-dev libexiv2-dev \
+            libavcodec-dev libavformat-dev libswresample-dev libswscale-dev libavfilter-dev \
+            libflatbuffers-dev libfmt-dev libfribidi-dev libfstrcmp-dev \
+            libharfbuzz-dev liblzo2-dev libpcre2-dev nlohmann-json3-dev \
+            libspdlog-dev libtag1-dev libtinyxml-dev libtinyxml2-dev zlib1g-dev \
+            libgbm-dev libdrm-dev libinput-dev libxkbcommon-dev \
+            libdisplay-info-dev libgles2-mesa-dev libegl1-mesa-dev \
+            libcdio-dev libiso9660-dev libdvdread-dev libdvdnav-dev \
+            libbluetooth-dev libcap-dev libcec-dev libdbus-1-dev \
+            liblcms2-dev liblirc-dev libnfs-dev libplist-dev libsmbclient-dev \
+            libsndio-dev libxslt1-dev libpulse-dev libpipewire-0.3-dev \
+            libavahi-client-dev libbluray-dev libmicrohttpd-dev libudfread-dev \
+            python3-dev
+
+      - name: Configure Custom Kodi Source
+        env:
+          KODI_SHA: ${{ steps.resolve_kodi.outputs.kodi_sha }}
+        run: |
+          KODI_TARBALL_URL="https://github.com/${{ inputs.kodi_repo }}/archive/\${PKG_VERSION}.tar.gz"
+          sed -i "s|^PKG_VERSION=.*|PKG_VERSION=\"${KODI_SHA}\"|" packages/mediacenter/kodi/package.mk
+          sed -i "s|^PKG_SHA256=.*|PKG_SHA256=\"\"|" packages/mediacenter/kodi/package.mk
+          sed -i "s|^PKG_URL=.*|PKG_URL=\"${KODI_TARBALL_URL}\"|" packages/mediacenter/kodi/package.mk
+
+      - name: Unpack and Patch Kodi
+        run: |
+          PROJECT=Generic ARCH=x86_64 ./scripts/unpack kodi
+          KODI_BUILD_DIR=$(find build*/build -maxdepth 1 -name "kodi-*" -type d | head -n 1)
+          echo "KODI_BUILD_DIR=${KODI_BUILD_DIR}" >> $GITHUB_ENV
+          echo "✓ Kodi unpacked to ${KODI_BUILD_DIR}"
+
+      - name: Generate Compilation Database
+        run: |
+          cd ${{ env.KODI_BUILD_DIR }}
+          mkdir build_lint
+          cmake -S . -B build_lint \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DAPP_RENDER_SYSTEM=gles \
+            -DCORE_PLATFORM_NAME=gbm \
+            -DENABLE_INTERNAL_FFMPEG=ON \
+            -DENABLE_INTERNAL_CROSSGUID=ON \
+            -DENABLE_TESTING=OFF \
+            -DENABLE_PYTHON=OFF \
+            -DENABLE_UDEV=ON \
+            -DENABLE_ISO9660PP=OFF
+
+      - name: Run Clang-Tidy
+        run: |
+          cd ${{ env.KODI_BUILD_DIR }}
+          # We strictly fail on diagnostic errors (syntax/semantic) for ALL xbmc/cores files
+          # This covers AudioEngine, VideoPlayer, PVR, etc.
+          find xbmc/cores -name "*.cpp" | xargs clang-tidy -p build_lint --warnings-as-errors='clang-diagnostic-error'
