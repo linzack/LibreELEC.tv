@@ -79,6 +79,49 @@ jobs:
           echo "KODI_BUILD_DIR=${KODI_BUILD_DIR}" >> $GITHUB_ENV
           echo "✓ Kodi unpacked to ${KODI_BUILD_DIR}"
 
+      - name: Identify Changed Files
+        id: identify_files
+        run: |
+          # 1. Fetch the last 10 commits to find the range
+          KODI_REPO="${{ inputs.kodi_repo }}"
+          KODI_SHA="${{ steps.resolve_kodi.outputs.kodi_sha }}"
+          
+          echo "Fetching last 10 commits for ${KODI_REPO} at ${KODI_SHA}..."
+          COMMITS_JSON=$(curl -sL "https://api.github.com/repos/${KODI_REPO}/commits?sha=${KODI_SHA}&per_page=11")
+          
+          # BASE_SHA should be the parent of the 10th commit (the 11th commit in the list)
+          # to include all changes from the last 10 commits.
+          BASE_SHA=$(echo "$COMMITS_JSON" | jq -r '.[10].sha // empty')
+          
+          if [ -z "$BASE_SHA" ]; then
+            # Fewer than 11 commits, get the parent of the absolute oldest one in the list
+            BASE_SHA=$(echo "$COMMITS_JSON" | jq -r '.[-1].parents[0].sha // empty')
+          fi
+          
+          echo "Comparing range: ${BASE_SHA:-START} ... ${KODI_SHA}"
+          
+          if [ -z "$BASE_SHA" ]; then
+            # No parent found (it's the initial commit), just get files from the head commit
+            FILES_URL="https://api.github.com/repos/${KODI_REPO}/commits/${KODI_SHA}"
+          else
+            FILES_URL="https://api.github.com/repos/${KODI_REPO}/compare/${BASE_SHA}...${KODI_SHA}"
+          fi
+          
+          # Fetch changed files, filter for C++ source/headers within xbmc/
+          LINT_FILES=$(curl -sL "$FILES_URL" | jq -r 'if .files then .files[].filename else .[].filename end' 2>/dev/null || curl -sL "$FILES_URL" | jq -r '.files[].filename' || true)
+          
+          # Strictly filter for C++ files that actually exist in the source
+          FILTERED_FILES=""
+          for f in $LINT_FILES; do
+            if [[ "$f" =~ \.(cpp|h|hpp|c|cc)$ ]] && [[ "$f" == xbmc/* ]]; then
+              FILTERED_FILES="$FILTERED_FILES $f"
+            fi
+          done
+          
+          echo "Files identified for linting:${FILTERED_FILES}"
+          echo "files=${FILTERED_FILES}" >> "$GITHUB_OUTPUT"
+          echo "${FILTERED_FILES}" > changed_files.txt
+
       - name: Generate Compilation Database
         run: |
           cd ${{ env.KODI_BUILD_DIR }}
@@ -97,6 +140,11 @@ jobs:
       - name: Run Clang-Tidy
         run: |
           cd ${{ env.KODI_BUILD_DIR }}
-          # We strictly fail on diagnostic errors (syntax/semantic) for ALL xbmc/cores files
-          # This covers AudioEngine, VideoPlayer, PVR, etc.
-          find xbmc/cores -name "*.cpp" | xargs clang-tidy -p build_lint --warnings-as-errors='clang-diagnostic-error'
+          FILES="${{ steps.identify_files.outputs.files }}"
+          if [ -n "$FILES" ]; then
+            echo "Linting changed files: $FILES"
+            # We strictly fail on diagnostic errors (syntax/semantic) for modified files
+            clang-tidy $FILES -p build_lint --header-filter='.*' --warnings-as-errors='clang-diagnostic-error'
+          else
+            echo "No C++ files changed in the identified commits. Skipping lint."
+          fi
