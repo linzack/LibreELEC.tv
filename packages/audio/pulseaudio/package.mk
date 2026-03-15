@@ -4,10 +4,10 @@
 
 PKG_NAME="pulseaudio"
 PKG_VERSION="17.0"
-PKG_SHA256="053794d6671a3e397d849e478a80b82a63cb9d8ca296bd35b73317bb5ceb87b5"
+PKG_SHA256="ed36c8a0cdff7b57382a258d3e1a916f42500fbafd64dd3c2e258ed8f017ee90"
 PKG_LICENSE="LGPL-2.1-or-later"
-PKG_SITE="http://pulseaudio.org/"
-PKG_URL="http://www.freedesktop.org/software/pulseaudio/releases/${PKG_NAME}-${PKG_VERSION}.tar.xz"
+PKG_SITE="https://www.pulseaudio.org/"
+PKG_URL="https://github.com/pulseaudio/pulseaudio/archive/refs/tags/v${PKG_VERSION}.tar.gz"
 PKG_DEPENDS_TARGET="toolchain alsa-lib dbus glib libcap libsndfile libtool openssl soxr speexdsp systemd"
 PKG_LONGDESC="PulseAudio is a sound system for POSIX OSes, meaning that it is a proxy for your sound applications."
 
