@@ -45,7 +45,7 @@ jobs:
           echo "kodi_sha=${FULL_SHA}" >> "$GITHUB_OUTPUT"
           echo "kodi_short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
-          echo "✓ Resolved '${{ inputs.kodi_commit }}' -> ${FULL_SHA} (${SHORT_SHA})"
+          echo "<E2><9C><93> Resolved '${{ inputs.kodi_commit }}' -> ${FULL_SHA} (${SHORT_SHA})"
 
       - name: Install Dependencies
         run: |
@@ -71,6 +71,10 @@ jobs:
 
           echo "Modified package.mk:"
           head -n 15 packages/mediacenter/kodi/package.mk
+
+      - name: Pre-fetch All Packages
+        run: |
+          PROJECT=RPi DEVICE=RPi4 ARCH=aarch64 ./scripts/pkgjson | ./scripts/genbuildplan.py --build image | awk '{print $2}' | xargs -n1 ./scripts/get
 
       - name: Build Image
         run: |
