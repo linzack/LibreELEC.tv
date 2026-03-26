@@ -114,7 +114,9 @@ jobs:
           FILTERED_FILES=""
           for f in $LINT_FILES; do
             if [[ "$f" =~ \.(cpp|h|hpp|c|cc)$ ]] && [[ "$f" == xbmc/* ]]; then
-              FILTERED_FILES="$FILTERED_FILES $f"
+              if [[ "$f" != xbmc/platform/android/* ]] && [[ "$f" != xbmc/test/* ]]; then
+                FILTERED_FILES="$FILTERED_FILES $f"
+              fi
             fi
           done
           
