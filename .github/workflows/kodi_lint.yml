@@ -86,17 +86,8 @@ jobs:
           KODI_REPO="${{ inputs.kodi_repo }}"
           KODI_SHA="${{ steps.resolve_kodi.outputs.kodi_sha }}"
           
-          echo "Fetching last 10 commits for ${KODI_REPO} at ${KODI_SHA}..."
-          COMMITS_JSON=$(curl -sL "https://api.github.com/repos/${KODI_REPO}/commits?sha=${KODI_SHA}&per_page=11")
-          
-          # BASE_SHA should be the parent of the 10th commit (the 11th commit in the list)
-          # to include all changes from the last 10 commits.
-          BASE_SHA=$(echo "$COMMITS_JSON" | jq -r '.[10].sha // empty')
-          
-          if [ -z "$BASE_SHA" ]; then
-            # Fewer than 11 commits, get the parent of the absolute oldest one in the list
-            BASE_SHA=$(echo "$COMMITS_JSON" | jq -r '.[-1].parents[0].sha // empty')
-          fi
+          # Compare current branch (KODI_SHA) with master
+          BASE_SHA="master"
           
           echo "Comparing range: ${BASE_SHA:-START} ... ${KODI_SHA}"
           
@@ -114,9 +105,11 @@ jobs:
           FILTERED_FILES=""
           for f in $LINT_FILES; do
             if [[ "$f" =~ \.(cpp|h|hpp|c|cc)$ ]] && [[ "$f" == xbmc/* ]]; then
-              if [[ "$f" != xbmc/platform/android/* ]] && [[ "$f" != xbmc/test/* ]]; then
-                FILTERED_FILES="$FILTERED_FILES $f"
+              # Exclude platform-specific or test files that lack headers in this environment
+              if [[ "$f" == *"android"* ]] || [[ "$f" == "xbmc/test/"* ]] || [[ "$f" == *"WebOS"* ]]; then
+                continue
               fi
+              FILTERED_FILES="$FILTERED_FILES $f"
             fi
           done
           
