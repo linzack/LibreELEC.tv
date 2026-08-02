@@ -3,11 +3,11 @@
 # Copyright (C) 2018-present Team LibreELEC (https://libreelec.tv)
 
 PKG_NAME="binutils"
-PKG_VERSION="2.47"
-PKG_SHA256="154ab23b60070e8f27013c22977f1129425d67d1e8acd6e13010e617811e4cff"
+PKG_VERSION="2.44"
+PKG_SHA256="ce2017e059d63e67ddb9240e9d4ec49c2893605035cd60e92ad53177f4377237"
 PKG_LICENSE="GPL-3.0-or-later"
 PKG_SITE="https://www.gnu.org/software/binutils/"
-PKG_URL="https://mirrors.kernel.org/gnu/binutils/binutils-with-gold-${PKG_VERSION}.tar.xz"
+PKG_URL="https://mirrors.kernel.org/gnu/binutils/${PKG_NAME}-${PKG_VERSION}.tar.xz"
 PKG_DEPENDS_UNPACK="binutils-gold"
 PKG_DEPENDS_HOST="ccache:host bison:host flex:host linux:host"
 PKG_DEPENDS_TARGET="toolchain zlib binutils:host"

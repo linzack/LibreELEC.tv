@@ -3,11 +3,11 @@
 # Copyright (C) 2018-present Team LibreELEC (https://libreelec.tv)
 
 PKG_NAME="busybox"
-PKG_VERSION="1.38.0"
-PKG_SHA256="34f9ea6ff8636f2c9241153b9114eefa9e65674a45318ae1ef95bb5f31c53bb2"
+PKG_VERSION="1.37.0"
+PKG_SHA256="3311dff32e746499f4df0d5df04d7eb396382d7e108bb9250e7b519b837043a4"
 PKG_LICENSE="GPL-2.0-only"
 PKG_SITE="http://www.busybox.net"
-PKG_URL="https://mirrors.slackware.com/slackware/slackware64-current/source/a/mkinitrd/${PKG_NAME}-${PKG_VERSION}.tar.bz2"
+PKG_URL="http://deb.debian.org/debian/pool/main/b/busybox/busybox_${PKG_VERSION}.orig.tar.bz2"
 PKG_DEPENDS_TARGET="toolchain libtirpc"
 PKG_DEPENDS_INIT="toolchain libtirpc"
 PKG_LONGDESC="BusyBox combines tiny versions of many common UNIX utilities into a single small executable."
