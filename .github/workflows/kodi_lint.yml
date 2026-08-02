@@ -45,7 +45,7 @@ jobs:
             patchutils lzop make patch perl rdfind rsync sed tar unzip \
             xz-utils zip zstd libncurses5-dev libc6-dev \
             libjson-perl libparse-yapp-perl libxml-parser-perl \
-            xsltproc default-jre g++ xfonts-utils python3 \
+            xsltproc default-jre g++ xfonts-utils python3 meson ninja-build \
             clang-tidy clang-format cmake gperf \
             libudev-dev libasound2-dev libdbus-1-dev libfreetype6-dev \
             libsqlite3-dev libxml2-dev libxslt1-dev libssl-dev \
