@@ -3,11 +3,11 @@
 # Copyright (C) 2016-present Team LibreELEC (https://libreelec.tv)
 
 PKG_NAME="libdvdcss"
-PKG_VERSION="1.4.3-Next-Nexus-Alpha2-2"
-PKG_SHA256="f38c4a4e7a4f4da6d8e83b8852489aa3bb6588a915dc41f5ee89d9aad305a06e"
+PKG_VERSION="1.5.0"
+PKG_SHA256="f204a9d8ac8a8414095d556373e5af9b95bb7cc72bf1467d936a48c961e8c474"
 PKG_LICENSE="GPL-2.0-or-later"
 PKG_SITE="https://github.com/xbmc/libdvdcss"
-PKG_URL="https://github.com/xbmc/libdvdcss/archive/${PKG_VERSION}.tar.gz"
+PKG_URL="http://mirrors.kodi.tv/build-deps/sources/libdvdcss-${PKG_VERSION}.tar.bz2"
 PKG_DEPENDS_TARGET="toolchain"
 PKG_LONGDESC="libdvdcss is a simple library designed for accessing DVDs as a block device without having to bother about the decryption."
 PKG_TOOLCHAIN="manual"
