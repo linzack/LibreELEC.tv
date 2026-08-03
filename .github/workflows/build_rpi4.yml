@@ -76,6 +76,21 @@ jobs:
         run: |
           PROJECT=RPi DEVICE=RPi4 ARCH=aarch64 ./scripts/pkgjson | ./scripts/genbuildplan.py --build image | awk '{print $2}' | xargs -n1 ./scripts/get
 
+      - name: Early Pre-flight Source Verification (GitHub Actions CI Only)
+        run: |
+          source packages/multimedia/libdvdcss/package.mk
+          RAW_LINE=$(grep "LIBDVDCSS_URL=" packages/mediacenter/kodi/package.mk)
+          [ $(echo "${RAW_LINE}" | wc -l) -eq 1 ] || { echo "::error::Expected exactly 1 LIBDVDCSS_URL line"; exit 1; }
+          RAW_PATH=$(echo "${RAW_LINE}" | sed -e 's/.*-DLIBDVDCSS_URL=//' -e 's/"//g' | tr -d '\r\n')
+          RESOLVED_PATH=$(echo "${RAW_PATH}" | sed "s|\${SOURCES}|${SOURCES:-sources}|g" | sed "s|\$(get_pkg_version libdvdcss)|${PKG_VERSION}|g")
+          if [ ! -s "${RESOLVED_PATH}" ]; then
+            echo "::error::Pre-flight check failed! Target file '${RESOLVED_PATH}' does not exist or is 0 bytes."
+            echo "Downloaded files in '$(dirname "${RESOLVED_PATH}")':"
+            ls -la "$(dirname "${RESOLVED_PATH}")" || true
+            exit 1
+          fi
+          echo "✓ Pre-flight source verification passed for '${RESOLVED_PATH}'."
+
       - name: Build Image
         run: |
           ARCH=aarch64 BUILD_PERIODIC=nightly BUILDER_NAME=linzack PROJECT=RPi DEVICE=RPi4 scripts/image mkimage

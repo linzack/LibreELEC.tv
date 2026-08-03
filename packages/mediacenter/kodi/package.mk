@@ -138,7 +138,7 @@ configure_package() {
 
   if [ "${KODI_DVDCSS_SUPPORT}" = yes ]; then
     KODI_DVDCSS="-DENABLE_DVDCSS=ON \
-                 -DLIBDVDCSS_URL=${SOURCES}/libdvdcss/libdvdcss-$(get_pkg_version libdvdcss).tar.gz"
+                 -DLIBDVDCSS_URL=${SOURCES}/libdvdcss/libdvdcss-$(get_pkg_version libdvdcss).tar.bz2"
   else
     KODI_DVDCSS="-DENABLE_DVDCSS=OFF"
   fi
